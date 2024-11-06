@@ -12,15 +12,19 @@ import {
 } from "@chakra-ui/react";
 import { BigNumberish, ethers } from "ethers";
 import { useEthereum } from "../contexts/EthereumContext";
-import { UserOperation } from "../types/UserOperation";
 import axios from "axios";
 import AccountABI from "../abis/test.json";
 import SimpleAccountFactoryABI from "../abis/SimpleAccountFactory.json";
 import CounterJSON from "../abis/Counter.json";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
+import {
+  OperationType,
+  UserOperationField,
+  Account,
+} from "omni-account-sdk/build-esm/src/index";
+
 const counterABI = CounterJSON.abi;
-const { TypedDataEncoder } = ethers;
 
 const UserOpExecution = () => {
   const {
@@ -31,18 +35,16 @@ const UserOpExecution = () => {
     chainId,
     // fetchAAContractAddress,
   } = useEthereum();
-  const [userOp, setUserOp] = useState<UserOperation>({
+  const [userOp, setUserOp] = useState<UserOperationField>({
     sender: account || "0x",
-    nonce: 1,
+    nonce: BigInt(1),
     chainId: 11155111,
-    initCode: "0x",
     callData: "0x",
-    callGasLimit: 21000,
-    verificationGasLimit: 21000,
-    preVerificationGas: 10000,
-    maxFeePerGas: 20000000000,
-    maxPriorityFeePerGas: 1000000000,
-    paymasterAndData: "0x",
+    mainChainGasLimit: BigInt(200000),
+    destChainGasLimit: BigInt(0),
+    zkVerificationGasLimit: BigInt(270000),
+    mainChainGasPrice: BigInt(170000),
+    destChainGasPrice: BigInt(0),
   });
   const toast = useToast();
   const [toAddress, setToAddress] = useState("");
@@ -57,11 +59,11 @@ const UserOpExecution = () => {
     provider
   );
 
-  const counter_contract = new ethers.Contract(
-    process.env[`REACT_APP_COUNTER_11155111`]!,
-    counterABI,
-    provider
-  );
+  // const counter_contract = new ethers.Contract(
+  //   process.env[`REACT_APP_COUNTER_11155111`]!,
+  //   counterABI,
+  //   provider
+  // );
 
   const createAccountSample = async () => {
     // const ethValue = ethers.parseEther("0.01"); // 10^16 wei
@@ -99,16 +101,21 @@ const UserOpExecution = () => {
       SimpleAccountFactoryABI,
       signer
     );
+    console.log("signer", signer);
 
-    const preInitCode = account_factory.interface.encodeFunctionData(
-      "createAccount",
-      [owner, salt]
-    );
+    console.log("account_factory", await account_factory.getAddress());
 
-    const addressHex = ethers.hexlify(accountFactoryAddress);
-    const initCode = accountFactoryAddress + preInitCode.slice(2);
+    // const preInitCode = account_factory.interface.encodeFunctionData(
+    //   "createAccount",
+    //   [owner, salt]
+    // );
+
+    // const addressHex = ethers.hexlify(accountFactoryAddress);
+
+    // const initCode = accountFactoryAddress + preInitCode.slice(2);
 
     // account_factory.createAccount()
+    console.log("owner ", owner, " salt", salt);
     let initAccount: string = await account_factory.getAccountAddress(
       owner,
       salt
@@ -146,9 +153,18 @@ const UserOpExecution = () => {
 
       // Wait for the transaction to be mined
       let receipt = await tx.wait();
+
+      console.log("receipt", receipt);
       // Extract the address from the transaction receipt
       // The address should be in receipt.events[0].args[0] or similar based on contract's output
       // let initAccount = receipt.events[0].args[0];
+      toast({
+        title: "Success",
+        description: "Create Omni Account successfully!",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
     } catch {
       toast({
         title: "Error",
@@ -197,18 +213,16 @@ const UserOpExecution = () => {
     const chainIdNumber: number =
       chainId !== null ? parseInt(chainId, 10) : 11155111;
 
-    const sample: UserOperation = {
+    const sample: UserOperationField = {
       sender: aaContractAddress || "0x",
       nonce: new_nonce,
       chainId: chainIdNumber,
-      initCode: "0x",
       callData: callData,
-      callGasLimit: 200000,
-      verificationGasLimit: 270000,
-      preVerificationGas: 170000,
-      maxFeePerGas: 30000000000,
-      maxPriorityFeePerGas: 2000000000,
-      paymasterAndData: "0x",
+      mainChainGasLimit: "0x30d40",
+      destChainGasLimit: 0,
+      zkVerificationGasLimit: "0x41eb0",
+      mainChainGasPrice: "0x29810",
+      destChainGasPrice: 0,
     };
     setUserOp(sample);
   };
@@ -225,31 +239,32 @@ const UserOpExecution = () => {
       return;
     }
     const ethValue = ethers.parseEther("0");
-    const counterAddress = process.env[`REACT_APP_COUNTER_${chainId}`];
-    const incrementCallData =
-      counter_contract.interface.encodeFunctionData("increment");
-    const callData = account_contract.interface.encodeFunctionData("execute", [
-      counterAddress,
-      ethValue,
-      incrementCallData,
-    ]);
+    // const counterAddress = process.env[`REACT_APP_COUNTER_${chainId}`];
+    // const incrementCallData =
+    //   counter_contract.interface.encodeFunctionData("increment");
+    // const callData = account_contract.interface.encodeFunctionData("execute", [
+    //   counterAddress,
+    //   ethValue,
+    //   "",
+    // ]);
+    const callData =
+      "0xb61d27f6000000000000000000000000c97e73b2770a0eb767407242fb3d35524fe229de000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004d09de08a00000000000000000000000000000000000000000000000000000000";
 
     const new_nonce = (accountDetails?.nonce ?? 0) + 1;
+    console.log("new_nonce: ", new_nonce);
     const chainIdNumber: number =
       chainId !== null ? parseInt(chainId, 10) : 11155111;
 
-    const sample: UserOperation = {
+    const sample: UserOperationField = {
       sender: aaContractAddress || "0x",
       nonce: new_nonce,
       chainId: chainIdNumber,
-      initCode: "0x",
       callData: callData,
-      callGasLimit: 200000,
-      verificationGasLimit: 270000,
-      preVerificationGas: 170000,
-      maxFeePerGas: 30000000000,
-      maxPriorityFeePerGas: 2000000000,
-      paymasterAndData: "0x",
+      mainChainGasLimit: BigInt(200000),
+      destChainGasLimit: BigInt(0),
+      zkVerificationGasLimit: BigInt(270000),
+      mainChainGasPrice: BigInt(170000),
+      destChainGasPrice: BigInt(0),
     };
     setUserOp(sample);
   };
@@ -264,6 +279,11 @@ const UserOpExecution = () => {
     setUserOp({ ...userOp, [name]: Number(value) });
   };
 
+  const handleBigNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setUserOp({ ...userOp, [name]: BigInt(value) });
+  };
+
   const signAndSend = async () => {
     if (!signer) {
       toast({
@@ -276,88 +296,26 @@ const UserOpExecution = () => {
       return;
     }
 
-    try {
-      const domain = {
-        name: "OMNI-ACCOUNT",
-        version: "1.0",
-        // chainId: chainId,
-        // verifyingContract: process.env.REACT_APP_SEPOLIA_ENTRY_POINT!,
-      };
+    const value: UserOperationField = {
+      operationType: OperationType.UserAction,
+      sender: userOp.sender,
+      nonce: userOp.nonce,
+      chainId: userOp.chainId,
+      callData: userOp.callData,
+      mainChainGasLimit: userOp.mainChainGasLimit,
+      destChainGasLimit: userOp.destChainGasLimit,
+      zkVerificationGasLimit: userOp.zkVerificationGasLimit,
+      mainChainGasPrice: userOp.mainChainGasPrice,
+      destChainGasPrice: userOp.destChainGasPrice,
+    };
 
-      const types = {
-        UserOperation: [
-          { name: "sender", type: "address" },
-          { name: "nonce", type: "uint256" },
-          { name: "chainId", type: "uint64" },
-          { name: "initCode", type: "bytes" },
-          { name: "callData", type: "bytes" },
-          { name: "callGasLimit", type: "uint256" },
-          { name: "verificationGasLimit", type: "uint256" },
-          { name: "preVerificationGas", type: "uint256" },
-          { name: "maxFeePerGas", type: "uint256" },
-          { name: "maxPriorityFeePerGas", type: "uint256" },
-          { name: "paymasterAndData", type: "bytes" },
-        ],
-      };
+    const rpcUrl = process.env.REACT_APP_BACKEND_RPC_URL!;
 
-      const value = {
-        sender: userOp.sender,
-        nonce: userOp.nonce,
-        chainId: userOp.chainId,
-        initCode: userOp.initCode,
-        callData: userOp.callData,
-        callGasLimit: userOp.callGasLimit,
-        verificationGasLimit: userOp.verificationGasLimit,
-        preVerificationGas: userOp.preVerificationGas,
-        maxFeePerGas: userOp.maxFeePerGas,
-        maxPriorityFeePerGas: userOp.maxPriorityFeePerGas,
-        paymasterAndData: userOp.paymasterAndData,
-      };
+    const account_signer = new Account(rpcUrl, signer);
 
-      const signature = await signer.signTypedData(domain, types, value);
+    const { success, error } = await account_signer.sendUserOperation(value);
 
-      const signedUserOp = { ...userOp, signature };
-      const rpcUrl = process.env.REACT_APP_BACKEND_RPC_URL!;
-
-      console.log("signedUserOp: ", signedUserOp);
-      //     console.log("encodedUserOp Bytes: ", ethers.getBytes(encodedUserOp));
-
-      const recoveredAddress = ethers.verifyTypedData(
-        domain,
-        types,
-        value,
-        signature
-      );
-
-      console.log("Recovery Address:", recoveredAddress);
-      const hash = TypedDataEncoder.hash(domain, types, value);
-      console.log("Hash Message: ", hash);
-
-      const formattedUserOp = {
-        ...signedUserOp,
-        nonce: `0x${signedUserOp.nonce.toString(16)}`,
-        chainId: `0x${signedUserOp.chainId.toString(16)}`,
-        callGasLimit: `0x${signedUserOp.callGasLimit.toString(16)}`,
-        verificationGasLimit: `0x${signedUserOp.verificationGasLimit.toString(
-          16
-        )}`,
-        preVerificationGas: `0x${signedUserOp.preVerificationGas.toString(16)}`,
-        maxFeePerGas: `0x${signedUserOp.maxFeePerGas.toString(16)}`,
-        maxPriorityFeePerGas: `0x${signedUserOp.maxPriorityFeePerGas.toString(
-          16
-        )}`,
-      };
-
-      console.log("formattedUserOp:");
-      console.log(formattedUserOp);
-
-      await axios.post(rpcUrl, {
-        jsonrpc: "2.0",
-        method: "eth_sendUserOperation",
-        params: [formattedUserOp],
-        id: 1,
-      });
-
+    if (success) {
       toast({
         title: "Success",
         description: "UserOperation signed and sent successfully!",
@@ -365,7 +323,7 @@ const UserOpExecution = () => {
         duration: 5000,
         isClosable: true,
       });
-    } catch (error) {
+    } else {
       console.error("Failed to sign and send UserOperation", error);
       toast({
         title: "Error",
@@ -398,7 +356,7 @@ const UserOpExecution = () => {
             <FormLabel>Sender</FormLabel>
             <Input
               name="sender"
-              value={userOp.sender}
+              value={userOp.sender ? userOp.sender.toString() : "0x"}
               onChange={handleChange}
             />
           </FormControl>
@@ -407,8 +365,8 @@ const UserOpExecution = () => {
             <Input
               name="nonce"
               type="number"
-              value={userOp.nonce}
-              onChange={handleNumberChange}
+              value={userOp.nonce ? userOp.nonce.toString() : "0"}
+              onChange={handleBigNumberChange}
             />
           </FormControl>
           <FormControl mb="1">
@@ -416,77 +374,81 @@ const UserOpExecution = () => {
             <Input
               name="chainId"
               type="number"
-              value={userOp.chainId}
+              value={userOp.chainId ? userOp.chainId.toString() : "0"}
               onChange={handleNumberChange}
-            />
-          </FormControl>
-          <FormControl mb="1">
-            <FormLabel>initCode</FormLabel>
-            <Input
-              name="initCode"
-              value={userOp.initCode}
-              onChange={handleChange}
             />
           </FormControl>
           <FormControl mb="1">
             <FormLabel>callData</FormLabel>
             <Input
               name="callData"
-              value={userOp.callData}
+              value={userOp.callData ? userOp.callData.toString() : "0x"}
               onChange={handleChange}
             />
           </FormControl>
           <FormControl mb="1">
-            <FormLabel>callGasLimit</FormLabel>
+            <FormLabel>mainChainGasLimit</FormLabel>
             <Input
-              name="callGasLimit"
+              name="mainChainGasLimit"
               type="number"
-              value={userOp.callGasLimit}
-              onChange={handleNumberChange}
+              value={
+                userOp.mainChainGasLimit
+                  ? userOp.mainChainGasLimit.toString()
+                  : "0"
+              }
+              onChange={handleBigNumberChange}
             />
           </FormControl>
           <FormControl mb="1">
-            <FormLabel>verificationGasLimit</FormLabel>
+            <FormLabel>destChainGasLimit</FormLabel>
             <Input
-              name="verificationGasLimit"
+              name="destChainGasLimit"
               type="number"
-              value={userOp.verificationGasLimit}
-              onChange={handleNumberChange}
+              value={
+                userOp.destChainGasLimit
+                  ? userOp.destChainGasLimit.toString()
+                  : "0"
+              }
+              onChange={handleBigNumberChange}
             />
           </FormControl>
           <FormControl mb="1">
-            <FormLabel>preVerificationGas</FormLabel>
+            <FormLabel>zkVerificationGasLimit</FormLabel>
             <Input
-              name="preVerificationGas"
+              name="zkVerificationGasLimit"
               type="number"
-              value={userOp.preVerificationGas}
-              onChange={handleNumberChange}
+              value={
+                userOp.zkVerificationGasLimit
+                  ? userOp.zkVerificationGasLimit.toString()
+                  : "0"
+              }
+              onChange={handleBigNumberChange}
             />
           </FormControl>
           <FormControl mb="1">
-            <FormLabel>maxFeePerGas</FormLabel>
+            <FormLabel>mainChainGasPrice</FormLabel>
             <Input
-              name="maxFeePerGas"
+              name="mainChainGasPrice"
               type="number"
-              value={userOp.maxFeePerGas}
-              onChange={handleNumberChange}
+              value={
+                userOp.mainChainGasPrice
+                  ? userOp.mainChainGasPrice.toString()
+                  : "0"
+              }
+              onChange={handleBigNumberChange}
             />
           </FormControl>
           <FormControl mb="1">
-            <FormLabel>maxPriorityFeePerGas</FormLabel>
+            <FormLabel>destChainGasPrice</FormLabel>
             <Input
-              name="maxPriorityFeePerGas"
+              name="destChainGasPrice"
               type="number"
-              value={userOp.maxPriorityFeePerGas}
-              onChange={handleNumberChange}
-            />
-          </FormControl>
-          <FormControl mb="1">
-            <FormLabel>paymasterAndData</FormLabel>
-            <Input
-              name="paymasterAndData"
-              value={userOp.paymasterAndData}
-              onChange={handleChange}
+              value={
+                userOp.destChainGasPrice
+                  ? userOp.destChainGasPrice.toString()
+                  : "0"
+              }
+              onChange={handleBigNumberChange}
             />
           </FormControl>
         </Box>

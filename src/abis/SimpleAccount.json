@@ -29,7 +29,7 @@
   },
   {
     "type": "function",
-    "name": "addDeposit",
+    "name": "depositGas",
     "inputs": [],
     "outputs": [],
     "stateMutability": "payable"
@@ -95,7 +95,7 @@
   },
   {
     "type": "function",
-    "name": "getDeposit",
+    "name": "getPreGasBalance",
     "inputs": [],
     "outputs": [
       {
@@ -259,6 +259,19 @@
   },
   {
     "type": "function",
+    "name": "redeemGas",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -302,25 +315,20 @@
         "name": "_owner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "missingAccountFunds",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "validationData",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "withdrawDepositTo",
+    "name": "withdraw",
     "inputs": [
       {
         "name": "amount",
@@ -333,7 +341,7 @@
   },
   {
     "type": "function",
-    "name": "withdrawFromContract",
+    "name": "withdrawGas",
     "inputs": [
       {
         "name": "amount",

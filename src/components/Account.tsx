@@ -24,7 +24,8 @@ const Account: React.FC = () => {
   // const [accountDetails, setAccountDetails] = useState<AccountDetails | null>(
   //   null
   // );
-  const { chainId, aaContractAddress, error, account } = useEthereum();
+  const { chainId, aaContractAddress, error, account, accountSigner } =
+    useEthereum();
   const toast = useToast();
   const accountDetails = useSelector(
     (state: RootState) => state.account.accountDetails
@@ -33,32 +34,19 @@ const Account: React.FC = () => {
 
   useEffect(() => {
     const fetchUserOps = async () => {
-      try {
-        const response = await axios.post(
-          process.env.REACT_APP_BACKEND_RPC_URL!,
-          {
-            jsonrpc: "2.0",
-            method: "eth_getUserOpsForAccount",
-            params: [account, aaContractAddress],
-            id: 1,
-          }
+      if (account == null || aaContractAddress == null) {
+        console.error("Failed to fetch transaction history");
+      } else {
+        const userOpshistory = await accountSigner?.getUserOpsHistoryForAccount(
+          account,
+          aaContractAddress
         );
 
-        setUserOps(response.data.result || []);
-      } catch (error) {
-        toast({
-          title: "Failed to fetch transaction history",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-        console.error("Failed to fetch transaction history:", error);
+        setUserOps(userOpshistory?.history || []);
       }
     };
 
-    if (aaContractAddress) {
-      fetchUserOps();
-    }
+    fetchUserOps();
   }, [account, aaContractAddress, chainId]);
 
   if (!accountDetails) {

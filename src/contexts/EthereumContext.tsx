@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { ethers } from "ethers";
 import axios from "axios";
+import { Account } from "omni-account-sdk/build-esm/src/index";
 
 interface EthereumContextType {
   account: string | null;
@@ -8,6 +9,7 @@ interface EthereumContextType {
   signer: ethers.JsonRpcSigner | null;
   chainId: string | null;
   aaContractAddress: string | null;
+  accountSigner: Account | null;
   connect: () => Promise<void>;
   switchNetwork: (chainId: string) => Promise<void>;
   // fetchAAContractAddress: (account: string) => Promise<void>;
@@ -64,6 +66,7 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
   const [aaContractAddress, setAAContractAddress] = useState<string | null>(
     null
   );
+  const [accountSigner, setAccountSigner] = useState<Account | null>(null);
 
   const connect = async () => {
     if (!window.ethereum) {
@@ -73,6 +76,7 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
+      // const provider = new ethers.JsonRpcProvider("http://192.168.1.96:8545");
       setProvider(provider);
       const networkOk = await checkNetwork(provider);
       if (!networkOk) {
@@ -87,9 +91,15 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
       const account = await signer.getAddress();
       const network = await provider.getNetwork();
 
+      const accountSigner = new Account(
+        process.env.REACT_APP_BACKEND_RPC_URL!,
+        signer
+      );
+
       setAccount(account);
       setSigner(signer);
       setChainId(network.chainId.toString());
+      setAccountSigner(accountSigner);
       setError("");
       await fetchAAContractAddress(account);
     } catch (error) {
@@ -120,10 +130,15 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
       const newProvider = new ethers.BrowserProvider(window.ethereum);
       const updatedSigner = await newProvider.getSigner();
       const updatedNetwork = await newProvider.getNetwork();
+      const updatedAccountSigner = new Account(
+        process.env.REACT_APP_BACKEND_RPC_URL!,
+        updatedSigner
+      );
 
       setProvider(newProvider);
       setSigner(updatedSigner);
       setChainId(updatedNetwork.chainId.toString());
+      setAccountSigner(updatedAccountSigner);
       setError("");
     } catch (error) {
       console.error("Failed to switch network", error);
@@ -147,21 +162,11 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
       return;
     }
 
-    try {
-      const response = await axios.post(
-        process.env.REACT_APP_BACKEND_RPC_URL!,
-        {
-          jsonrpc: "2.0",
-          method: "eth_getUserAccount",
-          params: [account],
-          id: 1,
-        }
-      );
-
-      setAAContractAddress(response.data.result[0]);
-    } catch (error) {
-      console.error("API Request Failed:", error);
+    const aaContractAddress = await accountSigner?.getUserAccount(account);
+    if (aaContractAddress == null) {
       setError("Failed to fetch Omni Account Address.");
+    } else {
+      setAAContractAddress(aaContractAddress);
     }
   };
 
@@ -173,6 +178,7 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
         signer,
         chainId,
         aaContractAddress,
+        accountSigner,
         connect,
         switchNetwork,
         // fetchAAContractAddress,

@@ -182,6 +182,7 @@ const Banner = () => {
           >
             <option value="11155111">Sepolia Testnet (11155111)</option>
             <option value="421614">Arbitrum Sepolia (421614)</option>
+            <option value="31337">Hardhat Local Testnet (31337)</option>
           </Select>
 
           {account ? (
