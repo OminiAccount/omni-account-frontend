@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -6,7 +6,9 @@ import {
   Flex,
   FormControl,
   FormLabel,
+  HStack,
   Input,
+  Switch,
   Text,
   useToast,
 } from "@chakra-ui/react";
@@ -23,8 +25,10 @@ import {
   UserOperationField,
   Account,
 } from "omni-account-sdk/build-esm/src/index";
+import SimpleAccount from "../abis/SimpleAccount.json";
 
 const counterABI = CounterJSON.abi;
+const abstractAccountABI = SimpleAccount;
 
 const UserOpExecution = () => {
   const {
@@ -33,10 +37,12 @@ const UserOpExecution = () => {
     provider,
     signer,
     chainId,
+    accountSigner,
+    switchNetwork,
     // fetchAAContractAddress,
   } = useEthereum();
   const [userOp, setUserOp] = useState<UserOperationField>({
-    sender: account || "0x",
+    sender: aaContractAddress || "0x",
     nonce: BigInt(1),
     chainId: 11155111,
     callData: "0x",
@@ -49,6 +55,11 @@ const UserOpExecution = () => {
   const toast = useToast();
   const [toAddress, setToAddress] = useState("");
   const [amount, setAmount] = useState("0.01");
+  const [gasAmount, setGasAmount] = useState("");
+  const [isSwitchOn, setIsSwitchOn] = useState(false); // State for Switch
+  const [operationType, setOperationType] = useState<OperationType>(
+    OperationType.UserAction
+  );
   const accountDetails = useSelector(
     (state: RootState) => state.account.accountDetails
   );
@@ -58,6 +69,18 @@ const UserOpExecution = () => {
     AccountABI,
     provider
   );
+
+  // useEffect to set operationType based on gasAmount and isSwitchOn
+  useEffect(() => {
+    const amount = parseFloat(gasAmount);
+    if (isNaN(amount) || amount === 0) {
+      setOperationType(OperationType.UserAction);
+    } else if (isSwitchOn) {
+      setOperationType(OperationType.WithdrawAction);
+    } else {
+      setOperationType(OperationType.DepositAction);
+    }
+  }, [gasAmount, isSwitchOn]);
 
   // const counter_contract = new ethers.Contract(
   //   process.env[`REACT_APP_COUNTER_11155111`]!,
@@ -284,6 +307,78 @@ const UserOpExecution = () => {
     setUserOp({ ...userOp, [name]: BigInt(value) });
   };
 
+  const handleSwitchChange = (e: any) => {
+    setIsSwitchOn(e.target.checked);
+    // Optional: Add any additional logic here if needed
+  };
+
+  const handleGasAction = async () => {
+    if (!aaContractAddress) {
+      toast({
+        title: "No Omni Account binding to current EOA address",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    // switchNetwork will handle internal error
+    try {
+      await switchNetwork("11155111");
+      toast({
+        title: "Switched to Sepolia Testnet",
+        status: "info",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Fail to switch to Sepolia Testnet",
+        description: err.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      const amountInWei = ethers.parseEther(amount);
+
+      const contract = new ethers.Contract(
+        aaContractAddress,
+        abstractAccountABI,
+        signer
+      );
+
+      const tx =
+        operationType === OperationType.DepositAction
+          ? await contract.depositGas({
+              value: amountInWei,
+            })
+          : await contract.withdrawGas(amountInWei);
+
+      await tx.wait();
+      toast({
+        title: `${
+          operationType === OperationType.DepositAction ? "Deposit" : "Withdraw"
+        } successful`,
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Transaction failed",
+        description: err.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+    await signAndSend();
+  };
+
   const signAndSend = async () => {
     if (!signer) {
       toast({
@@ -297,7 +392,8 @@ const UserOpExecution = () => {
     }
 
     const value: UserOperationField = {
-      operationType: OperationType.UserAction,
+      operationType: operationType,
+      operationValue: ethers.parseEther(gasAmount || "0"),
       sender: userOp.sender,
       nonce: userOp.nonce,
       chainId: userOp.chainId,
@@ -309,25 +405,33 @@ const UserOpExecution = () => {
       destChainGasPrice: userOp.destChainGasPrice,
     };
 
-    const rpcUrl = process.env.REACT_APP_BACKEND_RPC_URL!;
+    console.log("value", value);
 
-    const account_signer = new Account(rpcUrl, signer);
+    if (accountSigner != null) {
+      const { success, error } = await accountSigner.sendUserOperation(value);
 
-    const { success, error } = await account_signer.sendUserOperation(value);
-
-    if (success) {
-      toast({
-        title: "Success",
-        description: "UserOperation signed and sent successfully!",
-        status: "success",
-        duration: 5000,
-        isClosable: true,
-      });
+      if (success) {
+        toast({
+          title: "Success",
+          description: "UserOperation signed and sent successfully!",
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        console.error("Failed to sign and send UserOperation", error);
+        toast({
+          title: "Error",
+          description: "Failed to sign and send UserOperation.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
     } else {
-      console.error("Failed to sign and send UserOperation", error);
       toast({
         title: "Error",
-        description: "Failed to sign and send UserOperation.",
+        description: "No account signer found. Please connect your wallet.",
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -457,6 +561,40 @@ const UserOpExecution = () => {
             <Button mb="4" onClick={createAccountSample}>
               Create Omni Account
             </Button>
+
+            <Box>
+              <Input
+                placeholder="Gas amount (ETH)"
+                value={gasAmount}
+                onChange={(e) => setGasAmount(e.target.value)}
+                mb="4"
+              />
+              <FormControl mb="4">
+                <Flex alignItems="center" justifyContent="space-between">
+                  <Button
+                    onClick={handleGasAction} // 替换为你的点击处理函数
+                    variant={
+                      operationType === OperationType.UserAction
+                        ? "outline"
+                        : "solid"
+                    }
+                    colorScheme="red"
+                    fontWeight="extrabold"
+                    disabled={operationType === OperationType.UserAction}
+                    mb="0"
+                  >
+                    {isSwitchOn ? "Withdraw Gas" : "Deposit Gas"}{" "}
+                    {gasAmount + " ETH"}
+                  </Button>
+                  <Switch
+                    id="gas-switch"
+                    isChecked={isSwitchOn}
+                    onChange={handleSwitchChange}
+                    colorScheme="red"
+                  />
+                </Flex>
+              </FormControl>
+            </Box>
             <Box>
               <Input
                 placeholder="Recipient address"

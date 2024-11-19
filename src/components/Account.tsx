@@ -34,15 +34,16 @@ const Account: React.FC = () => {
 
   useEffect(() => {
     const fetchUserOps = async () => {
-      if (account == null || aaContractAddress == null) {
+      if (account == null || aaContractAddress == null || chainId == null) {
         console.error("Failed to fetch transaction history");
       } else {
-        const userOpshistory = await accountSigner?.getUserOpsHistoryForAccount(
+        const accountInfo = await accountSigner?.getAccountInfo(
           account,
-          aaContractAddress
+          aaContractAddress,
+          chainId
         );
 
-        setUserOps(userOpshistory?.history || []);
+        setUserOps(accountInfo?.history || []);
       }
     };
 
@@ -66,7 +67,12 @@ const Account: React.FC = () => {
         </HStack>
         <HStack>
           <Text variant="title">Gas Balance: </Text>
-          <Text variant="description">{accountDetails.balance} WEI</Text>
+          <Text variant="description">
+            {ethers.formatEther(
+              `0x${BigInt(accountDetails.balance).toString(16)}`
+            )}{" "}
+            ETH
+          </Text>
         </HStack>
         <HStack>
           <Text variant="title">Nonce:</Text>
@@ -87,15 +93,15 @@ const Account: React.FC = () => {
 
             <Tbody>
               {userOps.map((tx, index) => {
-                const totalGasLimit =
-                  parseInt(tx.callGasLimit, 16) +
-                  parseInt(tx.verificationGasLimit, 16) +
-                  parseInt(tx.preVerificationGasLimit, 16);
+                const mainGasLimit =
+                  parseInt(tx.mainChainGasLimit, 16) +
+                  parseInt(tx.zkVerificationGasLimit, 16);
+
+                const destGasLimit = parseInt(tx.destChainGasLimit, 16);
 
                 const totalGasCost =
-                  totalGasLimit *
-                  (parseInt(tx.maxFeePerGas, 16) +
-                    parseInt(tx.maxPriorityFeePerGas, 16));
+                  mainGasLimit * parseInt(tx.mainChainGasPrice, 16) +
+                  destGasLimit * parseInt(tx.destChainGasPrice, 16);
 
                 const totalGasCostInEth = ethers.formatEther(
                   totalGasCost.toString()

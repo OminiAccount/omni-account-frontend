@@ -20,7 +20,8 @@ import SimpleAccount from "../abis/SimpleAccount.json";
 const abstractAccountABI = SimpleAccount;
 
 const TicketInteractionPage = () => {
-  const { chainId, switchNetwork, signer, aaContractAddress } = useEthereum();
+  const { chainId, switchNetwork, signer, aaContractAddress, accountSigner } =
+    useEthereum();
   const [amount, setAmount] = useState<string>("");
   const [account, setAccount] = useState<string>("");
   // selectedNetwork is only used for network switch, chainId is used for contract interaction.
@@ -58,7 +59,6 @@ const TicketInteractionPage = () => {
     }
 
     try {
-      // const contract = getTicketManagerContract();
       const amountInWei = ethers.parseEther(amount);
 
       const contract = new ethers.Contract(

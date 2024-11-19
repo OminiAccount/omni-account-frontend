@@ -8,46 +8,15 @@ import { AccountDetails } from "../types/Account";
 import { setAccountDetails } from "../features/account/accountSlice";
 import { useEffect, useState } from "react";
 
-const fetchAccountDetails = async (
-  address: string,
-  chainId: string
-): Promise<AccountDetails> => {
-  const rpcData = {
-    jsonrpc: "2.0",
-    method: "eth_getAccountInfo",
-    params: [address, parseInt(chainId, 10)],
-    // params: ["0xfd63ed0566a782ef57f559c6f5f9afece4866423", 11155111],
-    id: 1,
-  };
-
-  try {
-    const response = await axios.post(
-      process.env.REACT_APP_BACKEND_RPC_URL!,
-      rpcData
-    );
-
-    if (response.data && response.data.result) {
-      const result = response.data.result;
-
-      const accountDetails: AccountDetails = {
-        balance: result.Balance,
-        nonce: result.Nonce,
-        history: [],
-      };
-
-      return accountDetails;
-    } else {
-      throw new Error("Failed to get Omni Account Info");
-    }
-  } catch (error) {
-    console.error("Failed to send getAccountInfo request to backend:", error);
-    throw new Error("Failed to get Omni Account Info");
-  }
-};
-
 const Banner = () => {
-  const { account, connect, aaContractAddress, chainId, switchNetwork } =
-    useEthereum();
+  const {
+    account,
+    connect,
+    aaContractAddress,
+    chainId,
+    switchNetwork,
+    accountSigner,
+  } = useEthereum();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -83,8 +52,8 @@ const Banner = () => {
     if (chainId) {
       setSelectedNetwork(chainId);
     }
-    if (aaContractAddress && chainId) {
-      fetchAccountDetails(aaContractAddress, chainId)
+    if (account && aaContractAddress && chainId) {
+      fetchAccountDetails(account, aaContractAddress, chainId)
         .then((details) => dispatch(setAccountDetails(details)))
         .catch((error) => {
           toast({
@@ -114,6 +83,29 @@ const Banner = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
+
+  const fetchAccountDetails = async (
+    account: string,
+    accountAddress: string,
+    chainId: string
+  ): Promise<AccountDetails> => {
+    try {
+      const accountInfo = await accountSigner?.getAccountInfo(
+        account,
+        accountAddress,
+        chainId
+      );
+
+      if (accountInfo) {
+        return accountInfo;
+      } else {
+        throw new Error("Failed to get Omni Account Info");
+      }
+    } catch (error) {
+      console.error("Failed to send getAccountInfo request to backend:", error);
+      throw new Error("Failed to get Omni Account Info");
+    }
+  };
 
   return (
     <Box

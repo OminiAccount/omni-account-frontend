@@ -76,7 +76,6 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      // const provider = new ethers.JsonRpcProvider("http://192.168.1.96:8545");
       setProvider(provider);
       const networkOk = await checkNetwork(provider);
       if (!networkOk) {
@@ -101,7 +100,7 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
       setChainId(network.chainId.toString());
       setAccountSigner(accountSigner);
       setError("");
-      await fetchAAContractAddress(account);
+      await fetchAAContractAddress(account, accountSigner);
     } catch (error) {
       console.error("Failed to connect MetaMask", error);
       setError("Failed to connect MetaMask.");
@@ -156,13 +155,17 @@ export const EthereumProvider = ({ children }: EthereumProviderProps) => {
     }
   };
 
-  const fetchAAContractAddress = async (account: string) => {
+  const fetchAAContractAddress = async (
+    account: string,
+    accountSigner: Account
+  ) => {
     if (!account) {
       setError("Cannot fetch Omni Account: EOA or provider is not available.");
       return;
     }
 
-    const aaContractAddress = await accountSigner?.getUserAccount(account);
+    const aaContractAddress = await accountSigner.getUserAccount(account);
+
     if (aaContractAddress == null) {
       setError("Failed to fetch Omni Account Address.");
     } else {
