@@ -1,0 +1,17 @@
+version: "3.5"
+networks:
+  default:
+    name: omni-account
+
+services:
+  oa-frontend:
+    container_name: oa-frontend
+    image: orbiter/oa-frontend:v0.0.1
+#    restart: unless-stopped
+    ports:
+      - 3000:3000
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
