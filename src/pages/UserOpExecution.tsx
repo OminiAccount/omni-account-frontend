@@ -44,7 +44,7 @@ const UserOpExecution = () => {
   const [userOp, setUserOp] = useState<UserOperationField>({
     sender: aaContractAddress || "0x",
     nonce: BigInt(1),
-    chainId: 11155111,
+    chainId: chainId !== null ? parseInt(chainId, 10) : 11155111,
     callData: "0x",
     mainChainGasLimit: BigInt(200000),
     destChainGasLimit: BigInt(0),
@@ -103,7 +103,7 @@ const UserOpExecution = () => {
       return;
     }
     const owner = account;
-    const salt = 998;
+    const salt = 1;
 
     const accountFactoryAddress =
       process.env[`REACT_APP_ACCOUNT_FACTORY_${chainId}`];
@@ -324,7 +324,7 @@ const UserOpExecution = () => {
     }
     // switchNetwork will handle internal error
     try {
-      await switchNetwork("11155111");
+      await switchNetwork("31337"); // gas action only in sepolia
       toast({
         title: "Switched to Sepolia Testnet",
         status: "info",
@@ -343,7 +343,7 @@ const UserOpExecution = () => {
     }
 
     try {
-      const amountInWei = ethers.parseEther(amount);
+      const amountInWei = ethers.parseEther(gasAmount);
 
       const contract = new ethers.Contract(
         aaContractAddress,
@@ -359,6 +359,7 @@ const UserOpExecution = () => {
           : await contract.withdrawGas(amountInWei);
 
       await tx.wait();
+      await signAndSend();
       toast({
         title: `${
           operationType === OperationType.DepositAction ? "Deposit" : "Withdraw"
@@ -376,7 +377,6 @@ const UserOpExecution = () => {
         isClosable: true,
       });
     }
-    await signAndSend();
   };
 
   const signAndSend = async () => {
@@ -422,7 +422,7 @@ const UserOpExecution = () => {
         console.error("Failed to sign and send UserOperation", error);
         toast({
           title: "Error",
-          description: "Failed to sign and send UserOperation.",
+          description: `Failed to sign and send UserOperation: ${error}`,
           status: "error",
           duration: 5000,
           isClosable: true,
